@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cukup Cakap Projek - Multi Project Management</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link class="no-print" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* CSS KHUSUS CETAK - DIJAMIN TIDAK BLANK */
+        @media print {
+            /* Sembunyikan semua elemen aplikasi default agar tidak merusak kertas */
+            #sidebar, #main-content, #sidebar-backdrop, #btn-sidebar-open, .no-print {
+                display: none !important;
+                visibility: hidden !important;
+            }
+            
+            /* Sifat dasar dokumen cetak mengalir secara natural */
+            html, body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            /* Paksa area dokumen cetak menjadi elemen utama di kertas */
+            #print-document {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+
+            @page {
+                size: A4 portrait;
+                margin: 15mm;
+            }
+
+            /* Penataan cetakan tabel */
+            table { width: 100% !important; border-collapse: collapse !important; page-break-inside: auto; }
+            tr { page-break-inside: avoid !important; page-break-after: auto; }
+            thead { display: table-header-group !important; }
+            
+            /* Paksa warna teks & background muncul di PDF */
+            .text-slate-900, .text-slate-800, .text-slate-700, .text-slate-950, th, td, span, h1, p, div { 
+                color: #000000 !important; 
+            }
+            .text-emerald-600, .text-emerald-400 { 
+                color: #047857 !important; 
+            }
+            .bg-gray-100, .bg-gray-50 { 
+                background-color: #f3f4f6 !important; 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important; 
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex overflow-x-hidden antialiased relative">
+
+    <aside id="sidebar" class="w-0 md:w-64 bg-slate-950 border-r border-slate-800 transition-all duration-300 flex flex-col no-print shrink-0 h-screen fixed md:sticky top-0 left-0 overflow-hidden z-40">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center whitespace-nowrap">
+            <span class="font-bold text-base text-emerald-400 flex items-center gap-2">
+                <i class="fa-solid fa-square-kanban text-lg"></i> Cukup Cakap Projek
+            </span>
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white cursor-pointer p-1.5 hover:bg-slate-900 rounded"><i class="fa-solid fa-xmark md:fa-bars"></i></button>
+        </div>
+        
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto whitespace-nowrap">
+            <button onclick="createNewWorkspace()" class="nav-btn w-full text-left px-4 py-3 rounded-lg bg-emerald-600 text-white font-medium flex items-center gap-3 cursor-pointer">
+                <i class="fa-solid fa-square-plus w-5"></i> <span>New Workspace</span>
+            </button>
+            
+            <div class="pt-2">
+                <button onclick="toggleProjectDropdown()" class="w-full text-left px-4 py-2.5 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white flex items-center justify-between cursor-pointer group">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-folder text-amber-500 w-5"></i>
+                        <span class="font-medium text-sm tracking-wide">Projects</span>
+                    </div>
+                    <i id="project-arrow" class="fa-solid fa-chevron-down text-xs transition-transform duration-200 transform rotate-0"></i>
+                </button>
+                
+                <div id="project-dropdown-list" class="mt-1 pl-6 pr-2 space-y-1 transition-all duration-300 overflow-hidden max-h-none"></div>
+            </div>
+
+            <hr class="border-slate-800 my-4">
+
+            <button onclick="switchTab('settings')" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white flex flex-row items-center gap-3 cursor-pointer">
+                <i class="fa-solid fa-gear w-5"></i> <span>Database Master</span>
+            </button>
+        </nav>
+    </aside>
+
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-30 md:hidden no-print"></div>
+
+    <button id="btn-sidebar-open" onclick="toggleSidebar()" class="fixed top-4 left-4 z-20 bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white no-print cursor-pointer shadow-xl md:hidden">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+
+    <main class="flex-1 p-4 pt-16 md:p-8 min-w-0" id="main-content">
+        
+        <div id="central-alert-modal" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex justify-center items-center p-4 transition-all duration-300 no-print">
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+                <div id="alert-icon-container" class="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-2xl mb-4">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <h3 id="alert-title-text" class="text-lg font-bold text-white mb-2">Pemberitahuan</h3>
+                <p id="alert-body-text" class="text-sm text-slate-400 leading-relaxed mb-5">Prosedur berhasil dijalankan.</p>
+                <div id="alert-action-buttons" class="flex justify-center gap-3">
+                    <button onclick="closeCentralAlert()" class="bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm px-5 py-2 rounded-xl cursor-pointer w-full">Oke</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="custom-confirm-modal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex justify-center items-center p-4 no-print select-none">
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl transition-all scale-100">
+                <div class="w-14 h-14 bg-rose-500/10 text-rose-400 rounded-full flex items-center justify-center text-xl mb-4 mx-auto md:mx-0">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 id="confirm-modal-title" class="text-lg font-bold text-white mb-2 text-center md:text-left">Konfirmasi Hapus</h3>
+                <p id="confirm-modal-message" class="text-sm text-slate-400 leading-relaxed mb-6 text-center md:text-left">Apakah kamu yakin akan menghapus project ini?</p>
+                <div class="flex flex-col sm:flex-row justify-end gap-3">
+                    <button id="btn-confirm-cancel" onclick="closeCustomConfirm()" class="bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold text-sm px-5 py-2.5 rounded-xl cursor-pointer transition-all">Batal</button>
+                    <button id="btn-confirm-proceed" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl cursor-pointer transition-all shadow-lg shadow-rose-950/50">Ya, Hapus</button>
+                </div>
+            </div>
+        </div>
+
+        <section id="tab-workspace" class="tab-content space-y-6">
+            <div class="bg-slate-950 p-6 rounded-xl border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">PROJECT NAME</label>
+                    <input type="text" id="inp-project-name" value="Proyek Baru Tanpa Nama" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">CLIENT NAME</label>
+                    <input type="text" id="inp-client-name" value="" placeholder="Masukkan nama klien..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">DATE</label>
+                    <input type="date" id="inp-project-date" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <div class="flex flex-row gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800 w-full md:w-fit overflow-x-auto no-print whitespace-nowrap">
+                <button onclick="setViewMode('working')" id="btn-view-working" class="px-4 py-2 rounded-md font-medium text-sm bg-emerald-600 text-white cursor-pointer">1. Working Budget (Internal)</button>
+                <button onclick="setViewMode('quotation')" id="btn-view-quotation" class="px-4 py-2 rounded-md font-medium text-sm text-slate-400 hover:text-white cursor-pointer">2. Quotation (Client Penawaran)</button>
+                <button onclick="setViewMode('final')" id="btn-view-final" class="px-4 py-2 rounded-md font-medium text-sm text-slate-400 hover:text-white cursor-pointer">3. Final Report (Selisih Profit)</button>
+            </div>
+
+            <div class="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden no-print shadow-2xl">
+                <div class="overflow-x-auto w-full">
+                    <table class="w-full text-left border-collapse table-fixed min-w-[900px] md:min-w-[1000px]" id="main-budget-table">
+                        <thead id="table-header-dynamic"></thead>
+                        <tbody id="budget-categories-container"></tbody>
+                    </table>
+                </div>
+                
+                <div id="category-addition-bar" class="p-4 border-t border-slate-800 bg-slate-900/30 flex flex-wrap items-center gap-3 no-print">
+                    <input type="text" id="quick-cat-name" placeholder="Nama Kategori / Sub Judul Baru..." class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 w-full sm:w-64">
+                    <button onclick="addCategoryViaWorkspace()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center">
+                        <i class="fa-solid fa-folder-plus"></i> Tambah Sub Judul Baru
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row justify-between items-start gap-6 no-print pb-12">
+                <div class="text-sm text-slate-400 max-w-xl bg-slate-950 p-4 rounded-lg border border-slate-800 w-full">
+                    <p class="font-semibold text-slate-200 mb-1"><i class="fa-solid fa-circle-info text-emerald-400 mr-1"></i> Kebijakan Fleksibilitas Dokumen</p>
+                    Fitur **Preview & Cetak PDF** aktif secara instan apabila tabel sudah terisi komponen anggaran tanpa keterikatan status penyimpanan draf.
+                </div>
+                <div class="bg-slate-950 p-6 rounded-xl border border-slate-800 w-full lg:w-96 space-y-3 font-medium shadow-xl">
+                    <div class="flex justify-between text-slate-400"><span id="lbl-subtotal-text">Sub Total:</span> <span id="lbl-subtotal" class="text-white">Rp 0</span></div>
+                    <div class="flex justify-between text-slate-400" id="row-tax-container"><span>PPN (11%):</span> <span id="lbl-tax" class="text-white">Rp 0</span></div>
+                    <div class="flex justify-between border-t border-slate-800 pt-3 text-lg font-bold text-emerald-400"><span id="lbl-grandtotal-text">Grand Total:</span> <span id="lbl-grandtotal">Rp 0</span></div>
+                    <div class="grid grid-cols-2 gap-3 pt-2">
+                        <button onclick="saveProjectToStorage()" class="bg-emerald-600 text-slate-950 py-2.5 rounded-lg hover:bg-emerald-500 text-sm font-bold cursor-pointer flex items-center justify-center gap-1 w-full"><i class="fa-solid fa-floppy-disk"></i> Save Draft</button>
+                        <button id="btn-preview-pdf" onclick="openLivePreview()" disabled class="bg-slate-800 text-slate-500 py-2.5 rounded-lg text-sm font-semibold cursor-not-allowed flex items-center justify-center gap-1 w-full opacity-50">
+                            <i class="fa-solid fa-eye"></i> Preview & Cetak
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-settings" class="tab-content hidden space-y-6 pb-12">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h2 class="text-xl md:text-2xl font-bold text-white">Master Configuration Settings</h2>
+                <button onclick="switchTab('workspace')" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer w-full sm:w-auto text-center"><i class="fa-solid fa-arrow-left mr-1"></i> Kembali ke Workspace</button>
+            </div>
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div class="bg-slate-950 p-6 rounded-xl border border-slate-800 space-y-4 h-fit shadow-xl">
+                    <h3 class="text-lg font-bold text-slate-200 border-b border-slate-800 pb-2"><i class="fa-solid fa-sliders text-emerald-400 mr-2"></i>Global Pricing Rules</h3>
+                    <div>
+                        <label class="block text-xs text-slate-400 font-semibold mb-2">DEFAULT MARKUP RATE (%)</label>
+                        <input type="number" id="cfg-global-markup" value="30" onchange="renderTable()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+                <div class="bg-slate-950 p-6 rounded-xl border border-slate-800 space-y-4 xl:col-span-2 shadow-xl">
+                    <h3 class="text-lg font-bold text-slate-200 border-b border-slate-800 pb-2"><i class="fa-solid fa-database text-emerald-400 mr-2"></i>Add New Product Master Database</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 font-semibold mb-1">PRODUCT / ITEM NAME</label>
+                            <input type="text" id="new-item-name" placeholder="Contoh: Motion Development" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 font-semibold mb-1">DEFAULT UNIT</label>
+                            <input type="text" id="new-item-unit" placeholder="Pekerjaan" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 font-semibold mb-1">STANDARD COST PRICE (MODAL)</label>
+                            <input type="number" id="new-item-price" placeholder="10000000" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                    <button onclick="addNewMasterItem()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm cursor-pointer w-full md:w-auto"><i class="fa-solid fa-plus mr-1"></i> Simpan ke Database Master</button>
+                    
+                    <div class="overflow-x-auto border border-slate-800 rounded-lg mt-4 w-full">
+                        <table class="w-full text-left text-sm min-w-[700px]">
+                            <thead class="bg-slate-900 text-slate-300 font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3 w-[40%]">Service / Component Description</th>
+                                    <th class="p-3 w-[20%]">Default Unit</th>
+                                    <th class="p-3 text-right w-[25%]">Standard Cost Rate (IDR)</th>
+                                    <th class="p-3 text-center w-[15%]">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="master-items-table-body" class="divide-y divide-slate-800 text-slate-400"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="preview-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex justify-center items-start overflow-y-auto p-2 md:p-12 no-print">
+            <div class="w-full max-w-4xl bg-white text-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden my-4" id="preview-modal-inner-card">
+                <div class="bg-slate-900 p-4 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 no-print">
+                    <span class="font-medium text-sm text-slate-400"><i class="fa-solid fa-print mr-2"></i>Format Preview Berkas Siap Cetak A4</span>
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button onclick="executeSystemPrint()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg cursor-pointer flex items-center gap-1"><i class="fa-solid fa-file-pdf"></i> Simpan Jadi PDF / Print</button>
+                        <button onclick="closeLivePreview()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs px-4 py-2 rounded-lg cursor-pointer">Tutup</button>
+                    </div>
+                </div>
+                
+                <div class="p-4 md:p-12 bg-white flex-1 print-area overflow-x-auto w-full" id="print-document">
+                    <div class="flex justify-between items-center border-b-2 border-slate-900 pb-6 mb-6 min-w-[600px]">
+                        <div class="flex items-center">
+                            <img src="logo CC.png" alt="Logo Perusahaan" class="h-16 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('fallback-logo-text').classList.remove('hidden')">
+                            <div id="fallback-logo-text" class="hidden font-black text-2xl text-slate-950 bg-slate-200 w-12 h-12 rounded-lg flex items-center justify-center tracking-tight">CC</div>
+                        </div>
+                        <div class="text-right">
+                            <h1 id="lbl-preview-title" class="text-2xl font-black text-slate-900 tracking-wider">WORKING BUDGET</h1>
+                            <p class="text-xs text-slate-500 mt-1" id="lbl-preview-ref">REF: PLAN-2026-AUTO</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 text-sm mb-8 bg-slate-100 p-4 rounded-xl border border-slate-200 min-w-[600px]">
+                        <div class="space-y-1">
+                            <div><span class="text-slate-400 text-xs font-bold block uppercase tracking-wide">Client Partner</span> <span class="font-bold text-slate-800 text-base" id="prv-client-name">-</span></div>
+                        </div>
+                        <div class="space-y-1 text-right">
+                            <div><span class="text-slate-400 text-xs font-bold block uppercase tracking-wide">Project Title / Initiative</span> <span class="font-bold text-slate-800 text-base" id="prv-project-name">-</span></div>
+                            <div><span class="text-slate-400 text-xs font-bold block uppercase tracking-wide">Issue Date</span> <span class="font-medium text-slate-700" id="prv-project-date">-</span></div>
+                        </div>
+                    </div>
+
+                    <div id="preview-table-container" class="min-w-[600px]"></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        let masterServices = JSON.parse(localStorage.getItem('masterServices_v6.5')) || {
+            "Narasi & Riset": { price: 30000000, unit: "Pekerjaan" },
+            "Creative development & treatment": { price: 15000000, unit: "Pekerjaan" },
+            "Project manager": { price: 15000000, unit: "Pekerjaan" },
+            "Creative director": { price: 30000000, unit: "Pekerjaan" },
+            "Asset art & design enviroment / character": { price: 10000000, unit: "Pekerjaan" },
+            "Motion Development": { price: 10000000, unit: "Pekerjaan" }
+        };
+
+        let projectDatabase = JSON.parse(localStorage.getItem('projectDatabase_v6.5')) || {};
+        let activeProjectKey = null; 
+        let isDropdownOpen = true;
+        let currentViewMode = 'working';
+
+        let budgetData = [
+            { categoryName: "A. Komponen Utama", items: [{ description: '', qty: 1, unit: 'Pekerjaan', day: 1, price: 0 }] }
+        ];
+
+        document.getElementById('inp-project-date').valueAsDate = new Date();
+        renderMasterItemsTable();
+        renderTable();
+        renderProjectDropdown();
+
+        /* JAVASCRIPT LIFECYCLE SHIFTING UNTUK MENANGKAP ELEMEN CETAK KE LUAR DARI STRUKTUR TAILWIND FLEX BODY */
+        function executeSystemPrint() {
+            const printDoc = document.getElementById('print-document');
+            const innerCard = document.getElementById('preview-modal-inner-card');
+            
+            // Pindahkan kontainer cetak ke root terluar halaman (di bawah <body> langsung)
+            document.body.appendChild(printDoc);
+            
+            // Berikan jeda waktu super kecil agar browser menyusun ulang DOM tree, lalu panggil dialog print bawaan OS
+            setTimeout(() => {
+                window.print();
+                
+                // Setelah dialog print ditutup/selesai, kembalikan posisi kontainer ke dalam modal agar web normal kembali
+                innerCard.appendChild(printDoc);
+            }, 50);
+        }
+
+        function triggerCustomConfirm(title, message, onProceed) {
+            const modal = document.getElementById('custom-confirm-modal');
+            document.getElementById('confirm-modal-title').innerText = title;
+            document.getElementById('confirm-modal-message').innerText = message;
+            
+            const proceedBtn = document.getElementById('btn-confirm-proceed');
+            const newProceedBtn = proceedBtn.cloneNode(true);
+            proceedBtn.parentNode.replaceChild(newProceedBtn, proceedBtn);
+            
+            newProceedBtn.addEventListener('click', () => {
+                onProceed();
+                closeCustomConfirm();
+            });
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeCustomConfirm() {
+            document.getElementById('custom-confirm-modal').classList.add('hidden');
+        }
+
+        function triggerCentralAlert(title, message, type = 'success') {
+            const modal = document.getElementById('central-alert-modal');
+            document.getElementById('alert-title-text').innerText = title;
+            document.getElementById('alert-body-text').innerText = message;
+            modal.classList.remove('hidden');
+            if(type === 'success') setTimeout(() => { modal.classList.add('hidden'); }, 2000);
+        }
+
+        function closeCentralAlert() { document.getElementById('central-alert-modal').classList.add('hidden'); }
+        
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            
+            if (window.innerWidth < 768) {
+                if(sidebar.classList.contains('w-0')) {
+                    sidebar.classList.remove('w-0');
+                    sidebar.classList.add('w-64');
+                    backdrop.classList.remove('hidden');
+                } else {
+                    sidebar.classList.remove('w-64');
+                    sidebar.classList.add('w-0');
+                    backdrop.classList.add('hidden');
+                }
+            } else {
+                sidebar.classList.toggle('md:w-64'); 
+                sidebar.classList.toggle('md:w-0');
+            }
+        }
+
+        function toggleProjectDropdown() {
+            const list = document.getElementById('project-dropdown-list');
+            const arrow = document.getElementById('project-arrow');
+            isDropdownOpen = !isDropdownOpen;
+            if(isDropdownOpen) { list.classList.remove('hidden'); arrow.classList.remove('rotate-[-90deg]'); } 
+            else { list.classList.add('hidden'); arrow.classList.add('rotate-[-90deg]'); }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.add('w-0');
+                document.getElementById('sidebar').classList.remove('w-64');
+                document.getElementById('sidebar-backdrop').classList.add('hidden');
+            }
+        }
+
+        function saveProjectToStorage() {
+            const projName = document.getElementById('inp-project-name').value.trim();
+            const clientName = document.getElementById('inp-client-name').value.trim();
+            const projDate = document.getElementById('inp-project-date').value;
+
+            if(!projName || projName === 'Proyek Baru Tanita Nama' || projName === 'Proyek Baru Tanpa Nama') {
+                triggerCentralAlert("Nama Proyek Kosong", "Mohon isi nama 'PROJECT NAME' sebelum menyimpan!", "warning");
+                return;
+            }
+
+            projectDatabase[projName] = {
+                projectName: projName, clientName: clientName, projectDate: projDate,
+                tableRows: JSON.parse(JSON.stringify(budgetData)) 
+            };
+
+            localStorage.setItem('projectDatabase_v6.5', JSON.stringify(projectDatabase));
+            activeProjectKey = projName;
+            renderProjectDropdown();
+            evaluatePdfButtonStatus();
+            triggerCentralAlert("Draft Disimpan", `Berkas proyek "${projName}" berhasil dicatat.`, "success");
+        }
+
+        function renderProjectDropdown() {
+            const container = document.getElementById('project-dropdown-list');
+            container.innerHTML = '';
+            const keys = Object.keys(projectDatabase);
+            if(keys.length === 0) { container.innerHTML = `<p class="text-xs text-slate-600 italic py-1 pl-2">Belum ada berkas...</p>`; return; }
+
+            keys.forEach(key => {
+                const item = projectDatabase[key];
+                const isActive = (activeProjectKey === key);
+                const activeClass = isActive ? 'bg-slate-900 text-emerald-400 border-l-2 border-emerald-500' : 'text-slate-400 hover:bg-slate-900/50 hover:text-white';
+                
+                const btnWrapper = document.createElement('div');
+                btnWrapper.className = `group flex items-center justify-between text-xs font-medium px-3 py-2 rounded-md transition-all cursor-pointer ${activeClass}`;
+                btnWrapper.setAttribute('onclick', `loadProjectWorkspace('${key}')`);
+                
+                btnWrapper.innerHTML = `
+                    <span class="truncate w-40"><i class="fa-solid fa-file-invoice-dollar mr-2"></i>${item.projectName}</span>
+                    <button onclick="deleteProjectFromSidebar('${key}'); event.stopPropagation();" class="opacity-100 md:opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 cursor-pointer transition-all">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </button>
+                `;
+                container.appendChild(btnWrapper);
+            });
+        }
+
+        function deleteProjectFromSidebar(key) {
+            triggerCustomConfirm(
+                "Hapus Project", 
+                `Apakah kamu yakin akan menghapus project "${key}" ini dari draf?`, 
+                function() {
+                    delete projectDatabase[key];
+                    localStorage.setItem('projectDatabase_v6.5', JSON.stringify(projectDatabase));
+                    if(activeProjectKey === key) {
+                        createNewWorkspace();
+                    } else {
+                        renderProjectDropdown();
+                        evaluatePdfButtonStatus();
+                    }
+                    triggerCentralAlert("Berhasil", "Project draf telah berhasil dihapus.", "success");
+                }
+            );
+        }
+
+        function loadProjectWorkspace(key) {
+            switchTab('workspace');
+            const project = projectDatabase[key];
+            if(!project) return;
+            activeProjectKey = key;
+            document.getElementById('inp-project-name').value = project.projectName;
+            document.getElementById('inp-client-name').value = project.clientName || '';
+            document.getElementById('inp-project-date').value = project.projectDate || '';
+            budgetData = JSON.parse(JSON.stringify(project.tableRows));
+            renderTable(); renderProjectDropdown(); evaluatePdfButtonStatus();
+        }
+
+        function createNewWorkspace() {
+            switchTab('workspace'); activeProjectKey = null;
+            document.getElementById('inp-project-name').value = 'Proyek Baru Tanpa Nama';
+            document.getElementById('inp-client-name').value = '';
+            document.getElementById('inp-project-date').valueAsDate = new Date();
+            budgetData = [{ categoryName: "A. Komponen Utama", items: [{ description: '', qty: 1, unit: 'Unit', day: 1, price: 0 }] }];
+            renderTable(); renderProjectDropdown(); evaluatePdfButtonStatus();
+        }
+
+        function evaluatePdfButtonStatus() {
+            const pdfBtn = document.getElementById('btn-preview-pdf');
+            const hasItems = budgetData.some(cat => cat.items && cat.items.length > 0);
+            
+            if (hasItems) {
+                pdfBtn.disabled = false;
+                pdfBtn.className = "bg-emerald-600 text-slate-950 py-2.5 rounded-lg hover:bg-emerald-500 text-sm font-bold cursor-pointer flex items-center justify-center gap-1 w-full opacity-100";
+            } else {
+                pdfBtn.disabled = true;
+                pdfBtn.className = "bg-slate-800 text-slate-500 py-2.5 rounded-lg text-sm font-semibold cursor-not-allowed flex items-center justify-center gap-1 w-full opacity-50";
+            }
+        }
+
+        function renderMasterItemsTable() {
+            const tbody = document.getElementById('master-items-table-body'); 
+            tbody.innerHTML = '';
+            
+            Object.keys(masterServices).forEach((key, index) => {
+                const item = masterServices[key];
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-900/40 border-b border-slate-800/50 transition-colors";
+                
+                tr.innerHTML = `
+                    <td class="p-3">
+                        <input type="text" id="master-name-${index}" value="${key}" disabled class="w-full bg-transparent border border-transparent rounded px-2 py-1 text-white font-medium focus:outline-none focus:border-emerald-500 disabled:text-white">
+                    </td>
+                    <td class="p-3">
+                        <input type="text" id="master-unit-${index}" value="${item.unit}" disabled class="w-full bg-transparent border border-transparent rounded px-2 py-1 text-slate-300 focus:outline-none focus:border-emerald-500 disabled:text-slate-400">
+                    </td>
+                    <td class="p-3 text-right">
+                        <div class="flex items-center justify-end">
+                            <span id="master-price-label-${index}" class="text-emerald-400 font-mono">${formatIDR(item.price)}</span>
+                            <input type="number" id="master-price-input-${index}" value="${item.price}" class="hidden w-full max-w-[150px] bg-slate-900 border border-emerald-500 rounded px-2 py-1 text-right text-emerald-400 font-mono focus:outline-none">
+                        </div>
+                    </td>
+                    <td class="p-3 text-center whitespace-nowrap">
+                        <div class="inline-flex items-center gap-2">
+                            <button id="btn-master-edit-${index}" onclick="editMasterItem(${index}, '${key.replace(/'/g, "\\'")}')" class="text-slate-400 hover:text-emerald-400 p-1.5 hover:bg-slate-900 border border-transparent hover:border-slate-800 rounded transition-all cursor-pointer" title="Edit Item">
+                                <i class="fa-solid fa-pen text-xs"></i>
+                            </button>
+                            <button onclick="deleteMasterItem('${key.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-400 p-1.5 hover:bg-slate-900 border border-transparent hover:border-slate-800 rounded transition-all cursor-pointer" title="Hapus Item">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function editMasterItem(index, oldKey) {
+            const nameInput = document.getElementById(`master-name-${index}`);
+            const unitInput = document.getElementById(`master-unit-${index}`);
+            const priceLabel = document.getElementById(`master-price-label-${index}`);
+            const priceInput = document.getElementById(`master-price-input-${index}`);
+            const editBtn = document.getElementById(`btn-master-edit-${index}`);
+
+            if (nameInput.disabled) {
+                nameInput.disabled = false;
+                unitInput.disabled = false;
+                priceLabel.classList.add('hidden');
+                priceInput.classList.remove('hidden');
+                
+                nameInput.focus();
+                editBtn.innerHTML = `<i class="fa-solid fa-floppy-disk text-xs"></i>`;
+                editBtn.className = "text-emerald-400 hover:text-emerald-300 p-1.5 hover:bg-slate-900 border border-slate-700 rounded transition-all cursor-pointer";
+                editBtn.setAttribute('title', 'Simpan Perubahan');
+            } else {
+                const newName = nameInput.value.trim();
+                const newUnit = unitInput.value.trim();
+                const newPrice = parseFloat(priceInput.value);
+
+                if (!newName || !newUnit || isNaN(newPrice) || newPrice < 0) {
+                    triggerCentralAlert("Data Tidak Valid", "Mohon isi nama, satuan, dan harga dengan benar!", "warning");
+                    return;
+                }
+
+                if (oldKey !== newName) {
+                    delete masterServices[oldKey];
+                }
+
+                masterServices[newName] = { price: newPrice, unit: newUnit };
+                localStorage.setItem('masterServices_v6.5', JSON.stringify(masterServices));
+                
+                triggerCentralAlert("Data Diperbarui", `Product "${newName}" berhasil diupdate.`, "success");
+                
+                renderMasterItemsTable(); 
+                renderTable();
+            }
+        }
+
+        function deleteMasterItem(key) {
+            triggerCustomConfirm(
+                "Hapus Product Master", 
+                `Apakah kamu yakin ingin menghapus "${key}" dari database master?`, 
+                function() {
+                    delete masterServices[key];
+                    localStorage.setItem('masterServices_v6.5', JSON.stringify(masterServices));
+                    triggerCentralAlert("Berhasil Dihapus", "Product telah dihapus dari database.", "success");
+                    renderMasterItemsTable();
+                    renderTable();
+                }
+            );
+        }
+
+        function addNewMasterItem() {
+            const name = document.getElementById('new-item-name').value.trim();
+            const unit = document.getElementById('new-item-unit').value.trim();
+            const price = parseFloat(document.getElementById('new-item-price').value);
+            
+            if(!name || !unit || isNaN(price)) {
+                triggerCentralAlert("Gagal Menambahkan", "Semua kolom input master product harus diisi!", "warning");
+                return;
+            }
+            
+            masterServices[name] = { price: price, unit: unit };
+            localStorage.setItem('masterServices_v6.5', JSON.stringify(masterServices));
+            
+            document.getElementById('new-item-name').value = ''; 
+            document.getElementById('new-item-unit').value = ''; 
+            document.getElementById('new-item-price').value = '';
+            
+            triggerCentralAlert("Ditambahkan", `"${name}" sukses masuk ke database master.`, "success");
+            renderMasterItemsTable(); 
+            renderTable();
+        }
+
+        function addCategoryViaWorkspace() {
+            const catName = document.getElementById('quick-cat-name').value.trim();
+            if(!catName) return;
+            budgetData.push({ categoryName: catName, items: [] });
+            document.getElementById('quick-cat-name').value = ''; renderTable();
+        }
+
+        function addLineItemToCategory(catIndex) {
+            budgetData[catIndex].items.push({ description: '', qty: 1, unit: 'Pekerjaan', day: 1, price: 0 });
+            renderTable();
+        }
+
+        function deleteLineItem(catIndex, itemIndex) { budgetData[catIndex].items.splice(itemIndex, 1); renderTable(); }
+        
+        function deleteCategory(catIndex) { 
+            triggerCustomConfirm(
+                "Hapus Sub Judul", 
+                `Apakah kamu yakin akan menghapus sub judul "${budgetData[catIndex].categoryName}" beserta seluruh komponen di dalamnya?`, 
+                function() {
+                    budgetData.splice(catIndex, 1); 
+                    renderTable();
+                }
+            );
+        }
+
+        function updateCategoryName(catIndex, newName) {
+            budgetData[catIndex].categoryName = newName;
+            recalculateAll();
+        }
+
+        function enableCategoryRename(catIndex) {
+            const inputEl = document.getElementById(`cat-input-${catIndex}`);
+            if(inputEl) {
+                inputEl.disabled = false;
+                inputEl.focus();
+                inputEl.select();
+                inputEl.classList.add('border-emerald-500');
+                inputEl.classList.remove('border-transparent');
+            }
+        }
+
+        function handleCategoryKeydown(event, catIndex) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const inputEl = document.getElementById(`cat-input-${catIndex}`);
+                if (inputEl) {
+                    inputEl.disabled = true;
+                    inputEl.blur();
+                    inputEl.classList.remove('border-emerald-500');
+                    inputEl.classList.add('border-transparent');
+                }
+            }
+        }
+
+        function updateItemField(catIndex, itemIndex, field, value) {
+            let item = budgetData[catIndex].items[itemIndex];
+            if(field === 'description') {
+                item.description = value;
+                if(masterServices[value]) {
+                    item.price = masterServices[value].price; item.unit = masterServices[value].unit;
+                    renderTable(); return; 
+                }
+            } else if (field === 'qty' || field === 'day' || field === 'price') {
+                item[field] = parseFloat(value) || 0;
+            } else { item[field] = value; }
+            recalculateAll();
+        }
+
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            const buttons = { working: document.getElementById('btn-view-working'), quotation: document.getElementById('btn-view-quotation'), final: document.getElementById('btn-view-final') };
+            Object.keys(buttons).forEach(k => { buttons[k].className = "px-4 py-2 rounded-md font-medium text-sm text-slate-400 hover:text-white cursor-pointer whitespace-nowrap"; });
+            buttons[mode].className = "px-4 py-2 rounded-md font-medium text-sm bg-emerald-600 text-white cursor-pointer whitespace-nowrap";
+            renderTable();
+        }
+
+        window.addEventListener('resize', () => {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            if(window.innerWidth >= 768) {
+                sidebar.classList.remove('w-0', 'w-64');
+                backdrop.classList.add('hidden');
+            } else {
+                sidebar.classList.add('w-0');
+                sidebar.classList.remove('w-64');
+            }
+        });
+
+        function formatIDR(num) { return 'Rp ' + Math.round(num).toLocaleString('id-ID'); }
+        function getMarkupRate() { return parseFloat(document.getElementById('cfg-global-markup').value) || 0; }
+
+        function renderTable() {
+            const headerContainer = document.getElementById('table-header-dynamic');
+            const categoryBar = document.getElementById('category-addition-bar');
+            
+            if (currentViewMode === 'final') {
+                categoryBar.classList.add('hidden');
+                headerContainer.innerHTML = `
+                    <tr class="bg-slate-900 text-slate-300 text-xs font-semibold tracking-wider border-b border-slate-800">
+                        <th class="p-4 w-[28%]">Description Item / Component</th>
+                        <th class="p-4 text-center w-[7%]">Qty</th>
+                        <th class="p-4 text-center w-[10%]">Unit</th>
+                        <th class="p-4 text-center w-[7%]">Day</th>
+                        <th class="p-4 text-right w-[16%]">Total Cost (Modal)</th>
+                        <th class="p-4 text-right w-[16%]">Total Sold (Client)</th>
+                        <th class="p-4 text-right w-[16%]">Net Profit Margin</th>
+                    </tr>`;
+            } else {
+                categoryBar.classList.remove('hidden');
+                headerContainer.innerHTML = `
+                    <tr class="bg-slate-900 text-slate-300 text-xs font-semibold tracking-wider border-b border-slate-800">
+                        <th class="p-4 w-[35%]">Description Item / Component</th>
+                        <th class="p-4 text-center w-[10%]">Qty</th>
+                        <th class="p-4 text-center w-[12%]">Unit</th>
+                        <th class="p-4 text-center w-[10%]">Day</th>
+                        <th class="p-4 text-right w-[15%]">${currentViewMode === 'working' ? 'Unit Price (Modal)' : 'Unit Price (+ Markup)'}</th>
+                        <th class="p-4 text-right w-[18%]">Total Amount</th>
+                        <th class="p-4 text-center w-[6%]">Action</th>
+                    </tr>`;
+            }
+
+            const container = document.getElementById('budget-categories-container');
+            container.innerHTML = '';
+            const markupMultiplier = 1 + (getMarkupRate() / 100);
+
+            budgetData.forEach((cat, catIdx) => {
+                const trCat = document.createElement('tr');
+                trCat.className = "bg-slate-900/90 text-emerald-400 font-bold border-y border-slate-800 text-sm";
+                
+                if (currentViewMode === 'working') {
+                    trCat.innerHTML = `
+                        <td colspan="6" class="p-2 pl-4 bg-slate-900">
+                            <div class="flex items-center gap-2 max-w-full">
+                                <i class="fa-solid fa-folder-open text-slate-500 shrink-0"></i>
+                                <input type="text" id="cat-input-${catIdx}" value="${cat.categoryName}" disabled onkeydown="handleCategoryKeydown(event, ${catIdx})" oninput="updateCategoryName(${catIdx}, this.value)" class="bg-transparent border-b border-transparent text-emerald-400 font-bold focus:outline-none w-full py-1 disabled:cursor-not-allowed transition-all" title="Klik tombol pensil di kolom Action untuk mengubah nama">
+                            </div>
+                        </td>
+                        <td class="p-2 text-center bg-slate-900 whitespace-nowrap">
+                            <div class="inline-flex items-center gap-1">
+                                <button onclick="enableCategoryRename(${catIdx})" class="text-slate-400 hover:text-white p-1.5 hover:bg-slate-950 rounded border border-transparent hover:border-slate-800 transition-all cursor-pointer inline-flex items-center justify-center" title="Edit Nama Sub Judul">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </button>
+                                <button onclick="deleteCategory(${catIdx})" class="text-rose-500 hover:text-rose-400 p-1.5 hover:bg-slate-950 rounded border border-transparent hover:border-slate-800 transition-all cursor-pointer inline-flex items-center justify-center" title="Hapus Sub Judul">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </div>
+                        </td>`;
+                } else {
+                    trCat.innerHTML = `<td colspan="${currentViewMode === 'final' ? 7 : 6}" class="p-3 pl-4 bg-slate-900"><span><i class="fa-solid fa-folder-open mr-2 text-slate-500"></i>${cat.categoryName}</span></td>`;
+                }
+                container.appendChild(trCat);
+
+                cat.items.forEach((item, itemIdx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-slate-800/60 text-sm";
+                    const costAmount = item.qty * (item.day || 1) * item.price;
+                    const soldAmount = costAmount * markupMultiplier;
+                    
+                    if (currentViewMode === 'final') {
+                        tr.innerHTML = `
+                            <td class="p-4 text-white font-medium pl-6">${item.description || '(Belum diisi)'}</td>
+                            <td class="p-4 text-center text-slate-300">${item.qty}</td>
+                            <td class="p-4 text-center text-slate-400">${item.unit}</td>
+                            <td class="p-4 text-center text-slate-300">${item.day}</td>
+                            <td class="p-4 text-right text-slate-400">${formatIDR(costAmount)}</td>
+                            <td class="p-4 text-right text-amber-400">${formatIDR(soldAmount)}</td>
+                            <td class="p-4 text-right text-emerald-400 font-bold">${formatIDR(soldAmount - costAmount)}</td>`;
+                    } else {
+                        let descCell = `
+                            <td class="p-2 pl-4">
+                                <input type="text" list="services-dropdown" value="${item.description}" oninput="updateItemField(${catIdx}, ${itemIdx}, 'description', this.value)" class="w-full bg-transparent border-b border-transparent focus:border-emerald-500 text-white focus:outline-none">
+                                <datalist id="services-dropdown">
+                                    ${Object.keys(masterServices).map(key => `<option value="${key}">`).join('')}
+                                </datalist>
+                            </td>`;
+                        
+                        let middleCells = '';
+                        if(currentViewMode === 'working') {
+                            middleCells = `
+                                <td class="p-2"><input type="number" value="${item.qty}" oninput="updateItemField(${catIdx}, ${itemIdx}, 'qty', this.value)" class="w-full bg-transparent text-center focus:outline-none"></td>
+                                <td class="p-2"><input type="text" value="${item.unit}" oninput="updateItemField(${catIdx}, ${itemIdx}, 'unit', this.value)" class="w-full bg-transparent text-center focus:outline-none"></td>
+                                <td class="p-2"><input type="number" value="${item.day}" oninput="updateItemField(${catIdx}, ${itemIdx}, 'day', this.value)" class="w-full bg-transparent text-center focus:outline-none"></td>
+                                <td class="p-2"><input type="number" value="${item.price}" oninput="updateItemField(${catIdx}, ${itemIdx}, 'price', this.value)" class="w-full bg-transparent text-right focus:outline-none pr-2"></td>
+                                <td class="p-4 text-right font-medium text-white">${formatIDR(costAmount)}</td>`;
+                        } else {
+                            middleCells = `
+                                <td class="p-4 text-center">${item.qty}</td><td class="p-4 text-center">${item.unit}</td><td class="p-4 text-center">${item.day}</td>
+                                <td class="p-4 text-right">${formatIDR(item.price * markupMultiplier)}</td>
+                                <td class="p-4 text-right text-emerald-400 font-bold">${formatIDR(soldAmount)}</td>`;
+                        }
+                        tr.innerHTML = descCell + middleCells + `<td class="p-4 text-center"><button onclick="deleteLineItem(${catIdx}, ${itemIdx})" class="text-rose-500 hover:text-rose-400 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>`;
+                    }
+                    container.appendChild(tr);
+                });
+
+                if(currentViewMode === 'working') {
+                    const trAdd = document.createElement('tr');
+                    trAdd.innerHTML = `<td colspan="7" class="p-3 pl-6 border-b border-slate-800"><button onclick="addLineItemToCategory(${catIdx})" class="text-xs font-semibold text-emerald-400 cursor-pointer"><i class="fa-solid fa-circle-plus"></i> Tambah Item</button></td>`;
+                    container.appendChild(trAdd);
+                }
+            });
+            recalculateAll();
+        }
+
+        function recalculateAll() {
+            let totalCost = 0; let totalSold = 0;
+            const markupMultiplier = 1 + (getMarkupRate() / 100);
+
+            budgetData.forEach((c) => {
+                c.items.forEach((i) => {
+                    const rowCost = i.qty * (i.day || 1) * i.price;
+                    totalCost += rowCost; totalSold += rowCost * markupMultiplier;
+                });
+            });
+
+            const subtotalLabel = document.getElementById('lbl-subtotal-text');
+            const grandLabel = document.getElementById('lbl-grandtotal-text');
+            const taxRow = document.getElementById('row-tax-container');
+
+            if (currentViewMode === 'final') {
+                taxRow.classList.add('hidden');
+                subtotalLabel.innerText = "Total Margin Keuntungan:";
+                grandLabel.innerText = "Estimasi ROI Proyek:";
+                const netProfitTotal = totalSold - totalCost;
+                const roiPercentage = totalCost > 0 ? ((netProfitTotal / totalCost) * 100).toFixed(1) : 0;
+                document.getElementById('lbl-subtotal').innerText = formatIDR(netProfitTotal);
+                document.getElementById('lbl-grandtotal').innerText = `${roiPercentage}% Net Profit`;
+            } else {
+                taxRow.classList.remove('hidden');
+                subtotalLabel.innerText = "Sub Total:"; grandLabel.innerText = "Grand Total:";
+                const sub = (currentViewMode === 'working') ? totalCost : totalSold;
+                document.getElementById('lbl-subtotal').innerText = formatIDR(sub);
+                document.getElementById('lbl-tax').innerText = formatIDR(sub * 0.11);
+                document.getElementById('lbl-grandtotal').innerText = formatIDR(sub * 1.11);
+            }
+
+            evaluatePdfButtonStatus();
+        }
+
+        function openLivePreview() {
+            document.getElementById('prv-project-name').innerText = document.getElementById('inp-project-name').value;
+            document.getElementById('prv-client-name').innerText = document.getElementById('inp-client-name').value;
+            document.getElementById('prv-project-date').innerText = document.getElementById('inp-project-date').value;
+            
+            const titleElement = document.getElementById('lbl-preview-title');
+            const container = document.getElementById('preview-table-container');
+            const markup = 1 + (getMarkupRate() / 100);
+            
+            let html = '';
+            let totalCost = 0;
+            let totalSold = 0;
+
+            if (currentViewMode === 'working') {
+                titleElement.innerText = "WORKING BUDGET";
+                html = `<table class="w-full text-xs text-left border border-slate-400">
+                    <thead>
+                        <tr class="bg-gray-100 font-bold border-b border-slate-400">
+                            <th class="p-3">Component Description</th>
+                            <th class="p-3 text-center">Qty</th>
+                            <th class="p-3 text-center">Unit</th>
+                            <th class="p-3 text-center">Day</th>
+                            <th class="p-3 text-right">Price (Modal)</th>
+                            <th class="p-3 text-right">Amount</th>
+                        </tr>
+                    </thead><tbody>`;
+            } else if (currentViewMode === 'quotation') {
+                titleElement.innerText = "QUOTATION";
+                html = `<table class="w-full text-xs text-left border border-slate-400">
+                    <thead>
+                        <tr class="bg-gray-100 font-bold border-b border-slate-400">
+                            <th class="p-3">Component Description</th>
+                            <th class="p-3 text-center">Qty</th>
+                            <th class="p-3 text-center">Unit</th>
+                            <th class="p-3 text-center">Day</th>
+                            <th class="p-3 text-right">Unit Price</th>
+                            <th class="p-3 text-right">Amount</th>
+                        </tr>
+                    </thead><tbody>`;
+            } else if (currentViewMode === 'final') {
+                titleElement.innerText = "FINAL REPORT";
+                html = `<table class="w-full text-xs text-left border border-slate-400">
+                    <thead>
+                        <tr class="bg-gray-100 font-bold border-b border-slate-400">
+                            <th class="p-3">Component Description</th>
+                            <th class="p-3 text-center">Qty</th>
+                            <th class="p-3 text-center">Day</th>
+                            <th class="p-3 text-right">Total Cost (Modal)</th>
+                            <th class="p-3 text-right">Total Sold (Client)</th>
+                            <th class="p-3 text-right">Margin Keuntungan</th>
+                        </tr>
+                    </thead><tbody>`;
+            }
+
+            budgetData.forEach(cat => {
+                if(cat.items.length === 0) return;
+                html += `<tr class="bg-gray-50 font-bold"><td colspan="6" class="p-2 pl-3 uppercase border bg-gray-100 text-slate-900">${cat.categoryName}</td></tr>`;
+                
+                cat.items.forEach(i => {
+                    const itemCost = i.qty * (i.day || 1) * i.price;
+                    const itemSold = itemCost * markup;
+                    totalCost += itemCost;
+                    totalSold += itemSold;
+
+                    if (currentViewMode === 'final') {
+                        html += `<tr class="border-b">
+                            <td class="p-2.5 pl-4 border">${i.description || '-'}</td>
+                            <td class="p-2.5 text-center border">${i.qty}</td>
+                            <td class="p-2.5 text-center border">${i.day}</td>
+                            <td class="p-2.5 text-right border">${formatIDR(itemCost)}</td>
+                            <td class="p-2.5 text-right border">${formatIDR(itemSold)}</td>
+                            <td class="p-2.5 text-right border font-bold text-emerald-600">${formatIDR(itemSold - itemCost)}</td>
+                        </tr>`;
+                    } else {
+                        const activeAmt = (currentViewMode === 'working') ? itemCost : itemSold;
+                        const activeUnitPrice = activeAmt / (i.qty * (i.day || 1)) || 0;
+                        html += `<tr class="border-b">
+                            <td class="p-2.5 pl-4 border">${i.description || '-'}</td>
+                            <td class="p-2.5 text-center border">${i.qty}</td>
+                            <td class="p-2.5 text-center border">${i.unit}</td>
+                            <td class="p-2.5 text-center border">${i.day}</td>
+                            <td class="p-2.5 text-right border">${formatIDR(activeUnitPrice)}</td>
+                            <td class="p-2.5 text-right border font-medium">${formatIDR(activeAmt)}</td>
+                        </tr>`;
+                    }
+                });
+            });
+
+            if (currentViewMode === 'final') {
+                const totalProfit = totalSold - totalCost;
+                html += `
+                    <tr><td colspan="5" class="p-2.5 text-right font-semibold bg-gray-50">Total Modal (Cost):</td><td class="p-2.5 text-right">${formatIDR(totalCost)}</td></tr>
+                    <tr><td colspan="5" class="p-2.5 text-right font-semibold bg-gray-50">Total Omset Penawaran:</td><td class="p-2.5 text-right">${formatIDR(totalSold)}</td></tr>
+                    <tr class="font-bold bg-gray-100 text-emerald-600"><td colspan="5" class="p-2.5 text-right">Bersih Profit Margin (Keuntungan):</td><td class="p-2.5 text-right">${formatIDR(totalProfit)}</td></tr>`;
+            } else {
+                const sub = (currentViewMode === 'working') ? totalCost : totalSold;
+                html += `
+                    <tr><td colspan="5" class="p-2.5 text-right font-semibold bg-gray-50">Sub Total:</td><td class="p-2.5 text-right">${formatIDR(sub)}</td></tr>
+                    <tr><td colspan="5" class="p-2.5 text-right font-semibold bg-gray-50">PPN (11%):</td><td class="p-2.5 text-right">${formatIDR(sub * 0.11)}</td></tr>
+                    <tr class="font-bold bg-gray-100"><td colspan="5" class="p-2.5 text-right">Grand Total:</td><td class="p-2.5 text-right">${formatIDR(sub * 1.11)}</td></tr>`;
+            }
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+            document.getElementById('preview-modal').classList.remove('hidden');
+        }
+
+        function closeLivePreview() { document.getElementById('preview-modal').classList.add('hidden'); }
+    </script>
+</body>
+</html>
