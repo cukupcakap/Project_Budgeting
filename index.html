@@ -306,21 +306,67 @@
         renderTable();
         renderProjectDropdown();
 
-        /* JAVASCRIPT LIFECYCLE SHIFTING UNTUK MENANGKAP ELEMEN CETAK KE LUAR DARI STRUKTUR TAILWIND FLEX BODY */
+        /* HYBRID FIX PRINT LIFECYCLE (IFRAME UNTUK HP, SHIFTING DOM UNTUK LAPTOP) */
         function executeSystemPrint() {
             const printDoc = document.getElementById('print-document');
-            const innerCard = document.getElementById('preview-modal-inner-card');
             
-            // Pindahkan kontainer cetak ke root terluar halaman (di bawah <body> langsung)
-            document.body.appendChild(printDoc);
+            // Deteksi jenis perangkat (Mobile vs Desktop)
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            // Berikan jeda waktu super kecil agar browser menyusun ulang DOM tree, lalu panggil dialog print bawaan OS
-            setTimeout(() => {
-                window.print();
+            if (isMobile) {
+                // KONDISI HP: Gunakan Iframe agar sistem print HP merender secara terisolasi tanpa hambatan Tailwind v4
+                let iframe = document.getElementById('print-iframe');
+                if (!iframe) {
+                    iframe = document.createElement('iframe');
+                    iframe.id = 'print-iframe';
+                    iframe.style.position = 'absolute';
+                    iframe.style.top = '-9999px';
+                    iframe.style.left = '-9999px';
+                    iframe.style.width = '100%';
+                    document.body.appendChild(iframe);
+                }
                 
-                // Setelah dialog print ditutup/selesai, kembalikan posisi kontainer ke dalam modal agar web normal kembali
-                innerCard.appendChild(printDoc);
-            }, 50);
+                const styles = document.head.innerHTML;
+                const printContent = printDoc.innerHTML;
+                const iframeDoc = iframe.contentWindow.document;
+                
+                iframeDoc.open();
+                iframeDoc.write(`
+                    <html>
+                        <head>
+                            ${styles}
+                            <style>
+                                body { background: white !important; color: black !important; padding: 10mm !important; }
+                                #print-document { display: block !important; width: 100% !important; }
+                                table { width: 100% !important; border-collapse: collapse !important; }
+                            </style>
+                        </head>
+                        <body>
+                            <div id="print-document">
+                                ${printContent}
+                            </div>
+                            <script>
+                                window.onload = function() {
+                                    setTimeout(function() {
+                                        window.print();
+                                    }, 300);
+                                };
+                            <\/script>
+                        </body>
+                    </html>
+                `);
+                iframeDoc.close();
+                
+            } else {
+                // KONDISI LAPTOP: Gunakan DOM Shifting kilat terbukti paling rapi di layar besar
+                const innerCard = document.getElementById('preview-modal-inner-card');
+                document.body.appendChild(printDoc);
+                
+                setTimeout(() => {
+                    window.print();
+                    innerCard.appendChild(printDoc);
+                }, 50);
+            }
         }
 
         function triggerCustomConfirm(title, message, onProceed) {
